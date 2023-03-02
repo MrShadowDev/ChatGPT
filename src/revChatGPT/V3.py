@@ -126,9 +126,7 @@ class Chatbot:
         Non-streaming ask
         """
         response = self.ask_stream(prompt, role, **kwargs)
-        full_response: str = ""
-        for chunk in response:
-            full_response += chunk
+        full_response: str = "".join(response)
         return full_response
 
     def rollback(self, n: int = 1):
@@ -215,9 +213,8 @@ def main():
         except KeyboardInterrupt:
             print("\nExiting...")
             sys.exit()
-        if prompt.startswith("!"):
-            if chatbot_commands(prompt):
-                continue
+        if prompt.startswith("!") and chatbot_commands(prompt):
+            continue
         print()
         print("ChatGPT: ", flush=True)
         if args.no_stream:
