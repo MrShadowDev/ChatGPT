@@ -68,10 +68,10 @@ class Conversations:
         """
         if conversation_id not in self.conversations:
             return ""
-        # Build conversation string from messages and check if it's too long
-        conversation = ""
-        for message in self.conversations[conversation_id].messages:
-            conversation += f"{message.author}: {message.text}<|im_sep|>\n\n"
+        conversation = "".join(
+            f"{message.author}: {message.text}<|im_sep|>\n\n"
+            for message in self.conversations[conversation_id].messages
+        )
         if len(ENCODER.encode(conversation)) > 4000 - CONVERSATION_BUFFER:
             self.purge_history(conversation_id)
             return self.get(conversation_id)
@@ -152,13 +152,7 @@ class Chatbot:
         body = self.__get_config()
         body["prompt"] = BASE_PROMPT + conversation + "ChatGPT: "
         body["max_tokens"] = get_max_tokens(conversation)
-        async with httpx.AsyncClient(proxies=self.proxy if self.proxy else None).stream(
-            method="POST",
-            url=PROXY_URL + "/completions",
-            data=json.dumps(body),
-            headers={"Authorization": f"Bearer {self.api_key}"},
-            timeout=1080,
-        ) as response:
+        async with httpx.AsyncClient(proxies=self.proxy or None).stream(method="POST", url=f"{PROXY_URL}/completions", data=json.dumps(body), headers={"Authorization": f"Bearer {self.api_key}"}, timeout=1080) as response:
             full_result = ""
             async for line in response.aiter_lines():
                 if response.status_code == 429:
@@ -179,7 +173,7 @@ class Chatbot:
                     print("error: " + "Unknown error")
                     raise Exception("Unknown error")
                 line = line.strip()
-                if line == "\n" or line == "":
+                if line in ["\n", ""]:
                     continue
                 if line == "data: [DONE]":
                     break
@@ -228,7 +222,7 @@ class Chatbot:
             self.api_key = auth.access_token
         else:
             auth_request = requests.post(
-                PROXY_URL + "/auth",
+                f"{PROXY_URL}/auth",
                 json={"email": email, "password": password},
                 timeout=10,
             )
@@ -334,9 +328,8 @@ async def main():
         session = create_session()
         while True:
             prompt = get_input("\nYou:\n", session=session)
-            if prompt.startswith("!"):
-                if commands(prompt):
-                    continue
+            if prompt.startswith("!") and commands(prompt):
+                continue
             print("ChatGPT:")
             async for line in chatbot.ask(prompt=prompt):
                 result = line["choices"][0]["text"].replace("<|im_end|>", "")
